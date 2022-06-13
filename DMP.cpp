@@ -37,22 +37,30 @@ public:
 };
 
 vector<Macro> MacroList;
+int diearea_x;
+int diearea_y;
 
 void myDEFParse(char* F){
     FILE *DEF_file = fopen(F, "r"); 
 
-    const char* comp = "COMPONENTS\0";
-    int comp_num;
+    const char* die = "DIEAREA\0";
     char s[128];
     while(fscanf(DEF_file, "%s", s) != EOF) { 
-        if(strcmp(s, comp)==0){
+        if(strcmp(s, die)==0){
+            for(int j=0;j<6;j++) fscanf(DEF_file, "%s", s);
+            diearea_x = atoi(s);
             fscanf(DEF_file, "%s", s);
-            comp_num = atoi(s);
-            fscanf(DEF_file, "%s", s);
+            diearea_y = atoi(s);
             break;
         }
     }
+    //printf("%d %d\n", diearea_x, diearea_y);
 
+    int comp_num;
+    for(int j=0;j<4;j++) fscanf(DEF_file, "%s", s);
+    comp_num = atoi(s);
+    fscanf(DEF_file, "%s", s);     //這裡要讀到分號
+    
     for(int i=0;i<comp_num;i++){
         fscanf(DEF_file, "%s", s); // "-"
         fscanf(DEF_file, "%s", s); // "name"
@@ -91,7 +99,7 @@ void myLEFParse(char* F){
         char s[128];
         while(fscanf(LEF_file, "%s", s) != EOF) { 
             if(strcmp(s, macroType)==0){
-                for(int j=0;j<14;j++) fscanf(LEF_file, "%s", s); //
+                for(int j=0;j<14;j++) fscanf(LEF_file, "%s", s); 
                 double x = atof(s);
                 fscanf(LEF_file, "%s", s);  //BY
                 fscanf(LEF_file, "%s", s);
@@ -125,12 +133,40 @@ void myLEFParse(char* F){
     fclose(LEF_file);
 };
 
+void writeDMP(char* Fin, char* Fout){
+    FILE *DEF_file = fopen(Fin, "r");
+    FILE *DMP_file = fopen(Fout, "w");
+    char buffer[128];
+    for(int i=0; i<4; i++){
+        fgets(buffer, 128, DEF_file);
+        fprintf(DMP_file, "%s", buffer);
+    }
+    // First 4 lines
+    for(int i=0; i<3; i++){
+        fgets(buffer, 128, DEF_file);
+    }
+    fprintf(DMP_file, "DIEAREA ( 0 0 ) ( %d %d ) ;\n\n", diearea_x, diearea_y);
+    fprintf(DMP_file, "%s", buffer);
+    for(auto i:MacroList){
+        fprintf(DMP_file, "\t- %s %s\n", i.name, i.type); 
+        fprintf(DMP_file, "\t\t+ PLACED ( %d %d ) %s ;\n", i.x, i.y, i.dir);
+    }
+    fprintf(DMP_file, "END COMPONENTS\n\n\n\nEND DESIGN\n\n");
+    
+    fclose(DEF_file);
+    fclose(DMP_file);
+};
+
 int main(int argc, char *argv[]) {
     
     // Parse DEF file
-    myDEFParse(argv[1]);
+    myDEFParse(argv[4]);
     
+    // Pasre LEF file
     myLEFParse(argv[2]);
+
+    // Write the output
+    writeDMP(argv[4], argv[6]);
 
     return 0;
 }
