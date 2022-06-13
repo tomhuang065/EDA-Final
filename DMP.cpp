@@ -159,6 +159,8 @@ void writeDMP(char* Fin, char* Fout){
     fclose(DMP_file);
 };
 
+int relevance[176][176];    // 各macro間的關係陣列
+
 void myVParse(char* F)
 {   int count = 0;
     int number[175][10000];
@@ -167,7 +169,6 @@ void myVParse(char* F)
     int index = 0;
     int counter = 0;
     char output_name[1000][150];
-    int relevance[176][176];
     string line;
     ifstream myVerilog;
     myVerilog.open(F);
