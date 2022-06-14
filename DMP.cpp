@@ -706,7 +706,7 @@ int main(int argc, char *argv[]) {
 
     writeDMP(argv[4], argv[6]);
 
-    cout << "The HPWL is : " << endl;
+    cout << "The HPWL is :  " << endl;
     //cout << count_length(MacroList[83], MacroList[81], 0, 0) << endl;
     cout << HPWL_total(MacroList) << endl;
 
