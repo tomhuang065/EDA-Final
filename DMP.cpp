@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <fstream>
 #include <string>
+#include <cmath>
 using namespace std;
 
 class Pin {
@@ -39,18 +40,17 @@ public:
 };
 
 vector<Macro> MacroList;
-int UNITS_DISTANCE_MICRONS;
 int diearea_x;
 int diearea_y;
+int UNITS_DISTANCE_MICRONS;
 
 void myDEFParse(char* F){
-    FILE *DEF_file = fopen(F, "r"); 
+    FILE *DEF_file = fopen(F, "r");
     char s[128];
     for(int j=0;j<10;j++) fscanf(DEF_file, "%s", s);
     UNITS_DISTANCE_MICRONS = atoi(s);
-    // cout << UNITS_DISTANCE_MICRONS << endl;
 
-    const char* die = "DIEAREA\0";  
+    const char* die = "DIEAREA\0";
     while(fscanf(DEF_file, "%s", s) != EOF) { 
         if(strcmp(s, die)==0){
             for(int j=0;j<6;j++) fscanf(DEF_file, "%s", s);
@@ -60,7 +60,7 @@ void myDEFParse(char* F){
             break;
         }
     }
-    // printf("%d %d\n", diearea_x, diearea_y);
+    //printf("%d %d\n", diearea_x, diearea_y);
 
     int comp_num;
     for(int j=0;j<4;j++) fscanf(DEF_file, "%s", s);
@@ -165,13 +165,15 @@ void writeDMP(char* Fin, char* Fout){
     fclose(DMP_file);
 };
 
-int mcount = 0; // the number of macros
+int count = 0; // the number of macros
 int number[256][10000]; //first column : number of nets connected to the macro, after : name of all nets connected to the macro (max : 1024)
+int pin[256][10000];
 int samenet[50000][3]; //store pairs of macros connected by the same net
-char store_name[1000][128]; // store the name of every macros
-int index = 0; //used when finding same nets
+char store_name[1000][100]; // store the name of every macros
+int index1 = 0; //used when finding same nets
 int counter = 0; //count the total number of paired macros
-char output_name[1000][150]; //gives the names of paired macros
+char output_name_1[1000][150]; //gives the names of paired macros
+char output_name_2[1000][150]; 
 int relevance[256][256]; // the relevance matrix(start from (1,1))
 
 void myVParse(char* F)
@@ -186,7 +188,7 @@ void myVParse(char* F)
             // cout << "true" << endl; 
             while(line[q] != '(')
             {
-                store_name[mcount][q] = line[q]; //if the sentence starts with 'b', store its name
+                store_name[count][q] = line[q]; //if the sentence starts with 'b', store its name
                 q++;
             }
             int nets = 0;           
@@ -201,7 +203,8 @@ void myVParse(char* F)
                         int num3 = line[i+8];
                         int num4 = line[i+9];
                         int num5 = line[i+10];
-                        number[mcount][nets] = (num1-48)*10000 + (num2-48)*1000 + (num3-48)*100 + (num4-48)*10 + (num5-48);
+                        number[count][nets] = (num1-48)*10000 + (num2-48)*1000 + (num3-48)*100 + (num4-48)*10 + (num5-48);
+                        pin[count][nets] = (line[i+2]-48)*10000 + line[i+3]-48;
                     }
                     if(line[i+5] == 'n' && line[i+12] == ')') // ex : ' .o2(n123456)
                     {   int num1 = line[i+6];
@@ -210,7 +213,8 @@ void myVParse(char* F)
                         int num4 = line[i+9];
                         int num5 = line[i+10];
                         int num6 = line[i+11];
-                        number[mcount][nets] = (num1-48)*100000 + (num2-48)*10000 + (num3-48)*1000 + (num4-48)*100+ (num5-48)*10 +num6-48;
+                        number[count][nets] = (num1-48)*100000 + (num2-48)*10000 + (num3-48)*1000 + (num4-48)*100+ (num5-48)*10 +num6-48;
+                        pin[count][nets] = (line[i+2]-48)*10000 + line[i+3]-48;
                     }
                     if(line[i+5] == 'n' && line[i+13] == ')') // ex : ' .o2(n1234567)
                     {   int num1 = line[i+6];
@@ -220,7 +224,8 @@ void myVParse(char* F)
                         int num5 = line[i+10];
                         int num6 = line[i+11];
                         int num7 = line[i+12];
-                        number[mcount][nets] = (num1-48)*1000000 + (num2-48)*100000 + (num3-48)*10000+ (num4-48)*1000 + (num5-48)*100 + (num6-48)*10 + num7 -48 ;
+                        number[count][nets] = (num1-48)*1000000 + (num2-48)*100000 + (num3-48)*10000+ (num4-48)*1000 + (num5-48)*100 + (num6-48)*10 + num7 -48 ;
+                        pin[count][nets] = (line[i+2]-48)*10000 + line[i+3]-48;
                     }
                     if(line[i+6] == 'n' && line[i+12] == ')') // ex : ' .o12(n12345)
                     {   int num1 = line[i+7];
@@ -228,7 +233,8 @@ void myVParse(char* F)
                         int num3 = line[i+9];
                         int num4 = line[i+10];
                         int num5 = line[i+11];
-                        number[mcount][nets] = (num1-48)*10000 + (num2-48)*1000 + (num3-48)*100 + (num4-48)*10 + (num5-48);
+                        number[count][nets] = (num1-48)*10000 + (num2-48)*1000 + (num3-48)*100 + (num4-48)*10 + (num5-48);
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*10 + line[i+4]- 48;
                     }
                     if(line[i+6] == 'n' && line[i+13] == ')')
                     {
@@ -238,7 +244,8 @@ void myVParse(char* F)
                         int num4 = line[i+10];
                         int num5 = line[i+11];
                         int num6 = line[i+12];
-                        number[mcount][nets] = (num1-48)*100000 + (num2-48)*10000 + (num3-48)*1000 + (num4-48)*100+ (num5-48)*10 + num6-48;
+                        number[count][nets] = (num1-48)*100000 + (num2-48)*10000 + (num3-48)*1000 + (num4-48)*100+ (num5-48)*10 + num6-48;
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*10 + line[i+4]- 48;
                     }
                     if(line[i+6] == 'n' && line[i+14] == ')')
                     {   int num1 = line[i+7];
@@ -248,7 +255,8 @@ void myVParse(char* F)
                         int num5 = line[i+11];
                         int num6 = line[i+12];
                         int num7 = line[i+13];
-                        number[mcount][nets] = (num1-48)*1000000 + (num2-48)*100000 + (num3-48)*10000+ (num4-48)*1000 + (num5-48)*100 + (num6-48)*10 + num7 -48 ;
+                        number[count][nets] = (num1-48)*1000000 + (num2-48)*100000 + (num3-48)*10000+ (num4-48)*1000 + (num5-48)*100 + (num6-48)*10 + num7 -48 ;
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*10 + line[i+4]- 48;
                     }
                     if(line[i+7] == 'n' && line[i+13] == ')')// ex : ' .o123(n12345)
                     {   int num1 = line[i+8];
@@ -256,7 +264,8 @@ void myVParse(char* F)
                         int num3 = line[i+10];
                         int num4 = line[i+11];
                         int num5 = line[i+12];
-                        number[mcount][nets] = (num1-48)*10000 + (num2-48)*1000 + (num3-48)*100 + (num4-48)*10 + (num5-48);
+                        number[count][nets] = (num1-48)*10000 + (num2-48)*1000 + (num3-48)*100 + (num4-48)*10 + (num5-48);
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*100 + (line[i+4]- 48)*10 +(line[i+5]-48);
                     }
                     if(line[i+7] == 'n' && line[i+14] == ')')
                     {   int num1 = line[i+8];
@@ -265,7 +274,8 @@ void myVParse(char* F)
                         int num4 = line[i+11];
                         int num5 = line[i+12];
                         int num6 = line[i+13];
-                        number[mcount][nets] = (num1-48)*100000 + (num2-48)*10000 + (num3-48)*1000 + (num4-48)*100+ (num5-48)*10 +num6-48;              
+                        number[count][nets] = (num1-48)*100000 + (num2-48)*10000 + (num3-48)*1000 + (num4-48)*100+ (num5-48)*10 +num6-48;  
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*100 + (line[i+4]- 48)*10 +(line[i+5]-48);     
                     }
                     if(line[i+7] == 'n' && line[i+15] == ')')
                     {   int num1 = line[i+8];
@@ -275,7 +285,8 @@ void myVParse(char* F)
                         int num5 = line[i+12];
                         int num6 = line[i+13];
                         int num7 = line[i+14];
-                        number[mcount][nets] = (num1-48)*1000000 + (num2-48)*100000 + (num3-48)*10000+ (num4-48)*1000 + (num5-48)*100 + (num6-48)*10 + num7 -48 ;
+                        number[count][nets] = (num1-48)*1000000 + (num2-48)*100000 + (num3-48)*10000+ (num4-48)*1000 + (num5-48)*100 + (num6-48)*10 + num7 -48 ;
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*100 + (line[i+4]- 48)*10 +(line[i+5]-48);
                     }
                     if(line[i+8] == 'n' && line[i+14] == ')')
                     {   int num1 = line[i+9];
@@ -283,7 +294,8 @@ void myVParse(char* F)
                         int num3 = line[i+11];
                         int num4 = line[i+12];
                         int num5 = line[i+13];
-                        number[mcount][nets] = (num1-48)*10000 + (num2-48)*1000 + (num3-48)*100 + (num4-48)*10 + (num5-48);
+                        number[count][nets] = (num1-48)*10000 + (num2-48)*1000 + (num3-48)*100 + (num4-48)*10 + (num5-48);
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*1000 + (line[i+4]- 48)*100 + (line[i+5]- 48)*10 + (line[i+6]- 48);
                     }
                     if(line[i+8] == 'n' && line[i+15] == ')')
                     {   int num1 = line[i+9];
@@ -292,7 +304,8 @@ void myVParse(char* F)
                         int num4 = line[i+12];
                         int num5 = line[i+13];
                         int num6 = line[i+14];
-                        number[mcount][nets] = (num1-48)*100000 + (num2-48)*10000 + (num3-48)*1000 + (num4-48)*100+ (num5-48)*10 +num6-48;              
+                        number[count][nets] = (num1-48)*100000 + (num2-48)*10000 + (num3-48)*1000 + (num4-48)*100+ (num5-48)*10 +num6-48;  
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*1000 + (line[i+4]- 48)*100 + (line[i+5]- 48)*10 + (line[i+6]- 48)  ;       
                     }
                     if(line[i+8] == 'n' && line[i+16] == ')')
                     {   int num1 = line[i+9];
@@ -302,261 +315,374 @@ void myVParse(char* F)
                         int num5 = line[i+13];
                         int num6 = line[i+14];
                         int num7 = line[i+15];
-                        number[mcount][nets] = (num1-48)*1000000 + (num2-48)*100000 + (num3-48)*10000+ (num4-48)*1000 + (num5-48)*100 + (num6-48)*10 + num7 -48 ;
+                        number[count][nets] = (num1-48)*1000000 + (num2-48)*100000 + (num3-48)*10000+ (num4-48)*1000 + (num5-48)*100 + (num6-48)*10 + num7 -48 ;
+                        pin[count][nets] = (line[i+2]-48)*10000 + (line[i+3]-48)*1000 + (line[i+4]- 48)*100 + (line[i+5]- 48)*10 + (line[i+6]- 48);
                     }
                 }
             }
-            number[mcount][0] = nets;// store the number of nets of the macro in the first column
-            mcount ++; //current number of macros
+            number[count][0] = nets;// store the number of nets of the macro in the first column
+            count ++; //current number of macros
         }   
     }
 
-    while(index < mcount) //check if there are same nets for different macros
+    while(index1 < count) //check if there are same nets for different macros
     {
-        for(int i = 0; i < number[index][0]; i ++) // starting from the first one
+        for(int i = 0; i < number[index1][0]; i ++) // starting from the first one
         {
-            for(int j = index + 1; j < mcount; j++)
+            for(int j = index1 + 1; j < count; j++)
             {
                 for(int k = 1; k < number[j][0]; k++) 
                 {
-                    if(number[index][i] == number[j][k] && number[index][i] != 0) // chck if the i-th net of the index macro and the k-th net of macro j are the same, j>index
+                    if(number[index1][i] == number[j][k] && number[index1][i] != 0) // chck if the i-th net of the index macro and the k-th net of macro j are the same, j>index
                     {
-                        samenet[counter][0] = index; //if two nets are found the same, store the number of each macro and the name of the net
+                        samenet[counter][0] = index1; //if two nets are found the same, store the number of each macro and the name of the net
                         samenet[counter][1] = j;
-                        samenet[counter][2] = number[index][i];
+                        samenet[counter][2] = number[index1][i];
                         counter++; 
                     }
                 }
             }
         }
-        index ++;
+        index1 ++;
     }
-    //cout << mcount << endl;
+    std::cout << count << endl;
 
     for(int t = 0; t < 1000; t++) //count the relevance of each pair of macro
     {
         // cout << samenet[t][0] << " " << samenet[t][1] << " " << samenet[t][2] << endl;
         relevance[samenet[t][0]][samenet[t][1]]+=1;
         relevance[samenet[t][1]][samenet[t][0]]+=1;
-        for(int o = 0; o <76; o++)
-        {
-            output_name[t][o] = store_name[samenet[t][0]][o]; //store the names of paired macros
-        }
-        for(int o = 76; o <150; o++)
-        {
-            output_name[t][o] = store_name[samenet[t][1]][o-76];
-        } 
+        output_name_1[t][0] = samenet[t][0];
+        output_name_2[t][0] = samenet[t][1];
 
+        for(int o = 1; o < 100; o++)
+        {
+            output_name_1[t][o] = store_name[samenet[t][0]][o]; //store the names of paired macros
+            output_name_2[t][o] = store_name[samenet[t][1]][o];
+        }
     }
     myFile.close();
 };
 
-bool isLegal(Macro i){
-    // N
-    bool overlap = true;
-    if(strcmp(i.dir,"N")==0){
-        // cout << i.dir << " ";
-        if(i.x < 0 || i.x+int(i.size_x) > diearea_x 
-        || i.y < 0 || i.y+int(i.size_y) > diearea_y) return false;
-        for(auto check:MacroList){
-            if(strcmp(i.name, check.name)!=0){
-                if(strcmp(check.dir,"N")==0){
-                    overlap = !((check.x>i.x+int(i.size_x))||(i.x>check.x+int(check.size_x))
-                              ||(check.y>i.y+int(i.size_y))||(i.y>check.y+int(check.size_y)));
-                }
-                else if(strcmp(check.dir,"FN")==0){
-                    overlap = !((check.x-int(check.size_x)>i.x+int(i.size_x))||(i.x>check.x)
-                              ||(check.y>i.y+int(i.size_y))||(i.y>check.y+int(check.size_y)));
-                }
-                else if(strcmp(check.dir,"S")==0){
-                    overlap = !((check.x-int(check.size_x)>i.x+int(i.size_x))||(i.x>check.x)
-                              ||(check.y-int(check.size_y)>i.y+int(i.size_y))||(i.y>check.y));
-                }
-                else{
-                    overlap = !((check.x>i.x+int(i.size_x))||(i.x>check.x+int(check.size_x))
-                              ||(check.y-int(check.size_y)>i.y+int(i.size_y))||(i.y>check.y));
-                }
-                if(overlap) return false;
-            }
+double count_length(Macro M_1, Macro M_2, int DIR1, int DIR2)
+{   
+    if(DIR1 == 4)
+    {
+        for(int i = 0; i < M_1.PinList.size(); i++)
+        {
+            M_1.PinList[i].pinx = 2*M_1.x - M_1.PinList[i].pinx;
         }
     }
-    // FN
-    else if(strcmp(i.dir,"FN")==0){
-        // cout << i.dir << " ";
-        if(i.x-int(i.size_x) < 0 || i.x > diearea_x 
-        || i.y < 0 || i.y+int(i.size_y) > diearea_y) return false;
-        for(auto check:MacroList){
-            if(strcmp(i.name, check.name)!=0){
-                if(strcmp(check.dir,"N")==0){
-                    overlap = !((check.x>i.x)||(i.x-int(i.size_x)>check.x+int(check.size_x))
-                              ||(check.y>i.y+int(i.size_y))||(i.y>check.y+int(check.size_y)));
-                }
-                else if(strcmp(check.dir,"FN")==0){
-                    overlap = !((check.x-int(check.size_x)>i.x)||(i.x-int(i.size_x)>check.x)
-                              ||(check.y>i.y+int(i.size_y))||(i.y>check.y+int(check.size_y)));                    
-                }
-                else if(strcmp(check.dir,"S")==0){
-                    overlap = !((check.x-int(check.size_x)>i.x)||(i.x-int(i.size_x)>check.x)
-                              ||(check.y-int(check.size_y)>i.y+int(i.size_y))||(i.y>check.y));
-                }
-                else{
-                    overlap = !((check.x>i.x)||(i.x-int(i.size_x)>check.x+int(check.size_x))
-                              ||(check.y-int(check.size_y)>i.y+int(i.size_y))||(i.y>check.y));                    
-                }
-                if(overlap) return false;
-            }
+    else if(DIR1 == 6)
+    {
+        for(int i = 0; i < M_1.PinList.size(); i++)
+        {
+            M_1.PinList[i].piny = 2*M_1.y - M_1.PinList[i].piny;
         }
     }
-    // S
-    else if(strcmp(i.dir,"S")==0){
-        // cout << i.dir << " ";
-        if(i.x-int(i.size_x) < 0 || i.x > diearea_x 
-        || i.y-int(i.size_y) < 0 || i.y > diearea_y) return false;
-        for(auto check:MacroList){
-            if(strcmp(i.name, check.name)!=0){
-                if(strcmp(check.dir,"N")==0){
-                    overlap = !((check.x>i.x)||(i.x-int(i.size_x)>check.x+int(check.size_x))
-                              ||(check.y>i.y)||(i.y-int(i.size_y)>check.y+int(check.size_y)));
-                }
-                else if(strcmp(check.dir,"FN")==0){
-                    overlap = !((check.x-int(check.size_x)>i.x)||(i.x-int(i.size_x)>check.x)
-                              ||(check.y>i.y)||(i.y-int(i.size_y)>check.y+int(check.size_y)));                    
-                }
-                else if(strcmp(check.dir,"S")==0){
-                    overlap = !((check.x-int(check.size_x)>i.x)||(i.x-int(i.size_x)>check.x)
-                              ||(check.y-int(check.size_y)>i.y)||(i.y-int(i.size_y)>check.y));
-                }
-                else{
-                    overlap = !((check.x>i.x)||(i.x-int(i.size_x)>check.x+int(check.size_x))
-                              ||(check.y-int(check.size_y)>i.y)||(i.y+int(i.size_y)>check.y));                    
-                }
-                if(overlap) return false;
-            }
+    else if(DIR1 == 2)
+    {
+        for(int i = 0; i < M_1.PinList.size(); i++)
+        {
+            M_1.PinList[i].piny = 2*M_1.y - M_1.PinList[i].piny;
         }
-    }
-    // FS
-    else{
-        // cout << i.dir << " ";
-        if(i.x < 0 || i.x+int(i.size_x) > diearea_x 
-        || i.y-int(i.size_y) < 0 || i.y > diearea_y) return false;
-        for(auto check:MacroList){
-            if(strcmp(i.name, check.name)!=0){
-                if(strcmp(check.dir,"N")==0){
-                    overlap = !((check.x>i.x+int(i.size_x))||(i.x>check.x+int(check.size_x))
-                              ||(check.y>i.y)||(i.y-int(i.size_y)>check.y+int(check.size_y)));
-                }
-                else if(strcmp(check.dir,"FN")==0){
-                    overlap = !((check.x-int(check.size_x)>i.x+int(i.size_x))||(i.x>check.x)
-                              ||(check.y>i.y)||(i.y-int(i.size_y)>check.y+int(check.size_y)));
-                }
-                else if(strcmp(check.dir,"S")==0){
-                    overlap = !((check.x-int(check.size_x)>i.x+int(i.size_x))||(i.x>check.x)
-                              ||(check.y-int(check.size_y)>i.y)||(i.y-int(i.size_y)>check.y));
-                }
-                else{
-                    overlap = !((check.x>i.x+int(i.size_x))||(i.x>check.x+int(check.size_x))
-                              ||(check.y-int(check.size_y)>i.y)||(i.y-int(i.size_y)>check.y));
-                }
-                if(overlap) return false;
-            }
+        for(int i = 0; i < M_1.PinList.size(); i++)
+        {
+            M_1.PinList[i].pinx = 2*M_1.x - M_1.PinList[i].pinx;
         }
     }
 
-    return true;
-};
+    if(DIR2 == 4)
+    {
+        for(int i = 0; i < M_2.PinList.size(); i++)
+        {
+            M_2.PinList[i].pinx = 2*M_2.x - M_2.PinList[i].pinx;
+        }
+    }
+    else if(DIR2 == 6)
+    {
+        for(int i = 0; i < M_2.PinList.size(); i++)
+        {
+            M_2.PinList[i].piny = 2*M_2.y - M_2.PinList[i].piny;
+        }
+    }
+    else if(DIR2 == 2)
+    {
+        for(int i = 0; i < M_2.PinList.size(); i++)
+        {
+            M_2.PinList[i].pinx = 2*M_2.x - M_2.PinList[i].pinx;
+        }
+        for(int i = 0; i < M_2.PinList.size(); i++)
+        {
+            M_2.PinList[i].piny = 2*M_2.y - M_2.PinList[i].piny;
+        }
+        
+    }
 
-int count_length(Macro M_1, Macro M_2){
+    // turn the type and the name of the two macros into strings
 
-};
-
-void mySlidingWindow(int constraint, int size){
-    int windowSizeX = diearea_x/size; 
-    int windowSizeY = diearea_y/size;
-    for(int windowX=1e7; windowX+windowSizeX<=diearea_x; windowX+=windowSizeX/2){
-        for(int windowY=0; windowY+windowSizeY<=diearea_y; windowY+=windowSizeY/2){
-            vector<pair<Macro, int>> insideMacros;
-            // 先找出哪先macro在現在這個window裡 -> 兩矩形有相交
-            for(auto i:MacroList){
-                bool isOverlap = !((windowX>i.x+int(i.size_x))||(i.x>windowX+windowSizeX)
-                                 ||(windowY>i.y+int(i.size_y))||(i.y>windowY+windowSizeY));
-                if(isOverlap) insideMacros.push_back(make_pair(i, 0));
-            }
-            // 為了能滿足relevance的操作
-            for(auto i:insideMacros){
-                char temp1[128], temp2[128];
-                // This is all for Yutang's format
-                strcpy(temp1, i.first.type);
-                int len1 = strlen(temp1);
-                temp1[len1] = ' ';
-                temp1[len1 + 1] = '\0';
-                strcpy(temp2, i.first.name);
-                int len2 = strlen(temp2);
-                temp2[len2] = ' ';
-                temp2[len2 + 1] = '\0';
-                strcat(temp1, temp2);
-                //////////////////////////////////
-                for(int j=0;j<mcount;j++){
-                    if(strcmp(temp1, store_name[j])==0){
-                        i.second = j+1;
-                        //cout << i.first.name << " " << i.second << endl;
-                        break;
-                    }
-                }
-            }
-            cout << endl;
-            // 現在我們可以正式對每個window去找他們的最佳解
-
-            // for(auto i:insideMacros){
-            //     cout << i.first.name << endl;
-            //     int origin_x = i.first.x;
-            //     int origin_y = i.first.y;
-            //     char origin_dir[128];
-            //     strcpy(origin_dir, i.first.dir);
-            //     for(int j=0;j<=constraint;j++){
-            //         for(int k=0;k<=constraint-j;k++){
-
-            //             i.first.x += j*UNITS_DISTANCE_MICRONS;
-            //             i.first.y += k*UNITS_DISTANCE_MICRONS;
-            //             if(isLegal(i.first)) cout << "N ";
-            //             i.first.x = origin_x;
-            //             i.first.y = origin_y;
-            //             strcpy(i.first.dir, origin_dir);
-
-            //             i.first.x += j*UNITS_DISTANCE_MICRONS;
-            //             i.first.y += k*UNITS_DISTANCE_MICRONS;
-            //             strcpy(i.first.dir, "FN");
-            //             if(isLegal(i.first)) cout << "FN ";
-            //             i.first.x = origin_x;
-            //             i.first.y = origin_y;
-            //             strcpy(i.first.dir, origin_dir);
-
-            //             i.first.x += j*UNITS_DISTANCE_MICRONS;
-            //             i.first.y += k*UNITS_DISTANCE_MICRONS;
-            //             strcpy(i.first.dir, "S");
-            //             if(isLegal(i.first)) cout << "S ";
-            //             i.first.x = origin_x;
-            //             i.first.y = origin_y;
-            //             strcpy(i.first.dir, origin_dir);
-
-            //             i.first.x += j*UNITS_DISTANCE_MICRONS;
-            //             i.first.y += k*UNITS_DISTANCE_MICRONS;
-            //             strcpy(i.first.dir, "FS");
-            //             if(isLegal(i.first)) cout << "FS ";
-            //             i.first.x = origin_x;
-            //             i.first.y = origin_y;
-            //             strcpy(i.first.dir, origin_dir);
-
-            //         }
-            //     }
-            //     cout << endl;
-            // }
-
-            
+    strcat(M_1.type, " ");
+    strcat(M_1.type, M_1.name);
+    strcat(M_1.type, " ");
+    strcat(M_2.type, " ");
+    strcat(M_2.type, M_2.name);
+    strcat(M_2.type, " ");
+    int num1 = 0;
+    int num2 = 0;
+    for(int i = 0; i < 1000; i ++)
+    {   
+        if(strcmp(M_1.type, store_name[i])==0)
+        {   
+            num1 = i;
+        }
+        if(strcmp(M_2.type, store_name[i])==0)
+        {   
+            num2 = i;
         }
     }
     
-    return;
+
+    //find connected nets in samenet[][]
+
+    int count_pin = 0;
+    int pinlist[50];
+    for(int i = 0; i < 1000; i ++)
+    {   
+        if(num1 == samenet[i][0] && num2 == samenet[i][1])
+        {
+            pinlist[count_pin] = samenet[i][2];
+            count_pin++;
+        }
+        if(num1 == samenet[i][1] && num2 == samenet[i][0])
+        {
+            pinlist[count_pin] = samenet[i][2];
+            count_pin++;
+        }
+    }
+
+    cout << count_pin << endl;
+    for(int i = 0; i < count_pin; i ++)
+    {
+        cout << pinlist[i] << endl;
+    }
+
+    //find the corresponding pin name in the number array and pin array
+
+    char pin_1[100][100];
+    char pin_2[100][100];
+    int ind = 0;
+    while(ind < count_pin )
+    {
+        for(int j = 0; j < 10000; j ++)
+        {
+            if(pinlist[ind]!= 0 && pinlist[ind] == number[num1][j])
+            {
+                pin_1[ind][0] = (pin[num1][j]/10000)+48;
+                if(pin[num1][j]%10000 >= 1000)
+                {   
+                    // cout << pin[num1][j] << " 1 " << ind << endl;
+                    pin_1[ind][1] = (pin[num1][j]%10000)/1000+48;
+                    pin_1[ind][2] = (pin[num1][j]%10000)%1000/100+48;
+                    pin_1[ind][3] = (pin[num1][j]%10000)%100/10+48;
+                    pin_1[ind][4] = (pin[num1][j]%10000)%1048;
+                }
+                else if(pin[num1][j]%10000 < 1000 && pin[num1][j]%10000 >= 100)
+                {   
+                    // cout << pin[num1][j] << " 2 "<< ind <<endl;
+                    pin_1[ind][1] = (pin[num1][j]%10000)/100+48;
+                    pin_1[ind][2] = (pin[num1][j]%10000)%100/10+48;
+                    pin_1[ind][3] = (pin[num1][j]%10000)%10+48;
+                }
+                else if(pin[num1][j]%10000 < 100 && pin[num1][j]%10000 >= 10)
+                {   
+                    // cout << pin[num1][j] << " 3" << ind <<endl;
+                    pin_1[ind][1] = (pin[num1][j]%10000)/10+48;
+                    pin_1[ind][2] = (pin[num1][j]%10000)%10+48;
+                }
+                else if(pin[num1][j]%10000 < 10)
+                {   
+                    // cout << pin[num1][j] << " 4 " << ind <<endl;
+                    pin_1[ind][1] = (pin[num1][j]%10000)+48;
+                }
+            }
+            if(pinlist[ind]!= 0 && pinlist[ind] == number[num2][j])
+            {
+                pin_2[ind][0] = (pin[num2][j]/10000)+48;
+                if(pin[num2][j]%10000 >= 1000)
+                {   
+                    // cout << pin[num2][j] << " 5 " << ind <<endl;
+                    pin_2[ind][1] = (pin[num2][j]%10000)/1000+48;
+                    pin_2[ind][2] = (pin[num2][j]%10000)%1000/100+48;
+                    pin_2[ind][3] = (pin[num2][j]%10000)%100/10+48;
+                    pin_2[ind][4] = (pin[num2][j]%10000)%10+48;
+                }
+                else if(pin[num2][j]%10000 < 1000 && pin[num2][j]%10000 >= 100)
+                {   
+                    // cout << pin[num2][j] << " 6 " << ind <<endl;
+                    pin_2[ind][1] = (pin[num2][j]%10000)/100+48;
+                    pin_2[ind][2] = (pin[num2][j]%10000)%100/10+48;
+                    pin_2[ind][3] = (pin[num2][j]%10000)%10+48;
+                }
+                else if(pin[num2][j]%10000 < 100 && pin[num2][j]%10000 >= 10)
+                {   
+                    // cout << pin[num2][j] << " 7 " << ind <<endl;
+                    pin_2[ind][1] = (pin[num2][j]%10000)/10+48;
+                    pin_2[ind][2] = (pin[num2][j]%10000)%10+48;
+                }
+                else if(pin[num2][j]%10000 < 10)
+                {   
+                    // cout << pin[num2][j] << " 8 " << ind <<endl;
+                    pin_2[ind][1] = (pin[num2][j]%10000)+48;
+                }
+            }
+        }
+        ind++;
+    }
+    for(int i = 0; i < count_pin; i++ )
+    {
+        cout << pin_1[i] << " ";
+        
+    }
+    cout << endl;
+    for(int i = 0; i < count_pin; i++ )
+    {
+        cout << pin_2[i] << " ";
+        
+    }
+    cout << endl;
+    
+    //find the corresponding location of the pinin Macrolist
+
+    double x1_tmp[100];
+    double y1_tmp[100];
+    double x2_tmp[100];
+    double y2_tmp[100];
+
+    for(int i = 0; i < count_pin; i ++)
+    {
+        for(int j = 0; j < M_1.PinList.size(); j++)
+        {
+            
+            if(strcmp(pin_1[i], M_1.PinList[j].pinName) == 0)
+            {
+                x1_tmp[i] = M_1.PinList[j].pinx;
+                y1_tmp[i] = M_1.PinList[j].piny;
+            }
+        }
+        for(int j = 0; j < M_2.PinList.size(); j++)
+        {
+            if(strcmp(pin_2[i], M_2.PinList[j].pinName) == 0)
+            {
+                x2_tmp[i] = M_2.PinList[j].pinx;
+                y2_tmp[i] = M_2.PinList[j].piny;
+            }
+        }   
+    }
+
+    for(int i = 0; i < count_pin; i++)
+    {
+        cout << "( " << x1_tmp[i] << ", " << y1_tmp[i] << " )  " <<  "( " << x2_tmp[i] << ", " << y2_tmp[i] << " )" << endl;
+    }
+    
+        
+
+    // //find the distance
+    double HPWL = 0;
+    double x_max = -100000000;
+    double x_min = 100000000;
+    double y_max = -100000000; 
+    double y_min = 100000000;
+    for(int i = 0; i < count_pin; i ++)
+    {
+        if(x1_tmp[i] > x_max)
+        {
+            x_max = x1_tmp[i];
+        }
+        else if(x1_tmp[i] < x_min)
+        {
+            x_min = x1_tmp[i];
+        }
+        if(x2_tmp[i] > x_max)
+        {
+            x_max = x2_tmp[i];
+        }
+        else if(x2_tmp[i] < x_min)
+        {
+            x_min = x2_tmp[i];
+        }
+        if(y1_tmp[i] > y_max)
+        {
+            y_max = y1_tmp[i];
+        }
+        else if(y1_tmp[i] < y_min)
+        {
+            y_min = y1_tmp[i];
+        }
+        if(y2_tmp[i] > y_max)
+        {
+            y_max = y2_tmp[i];
+        }
+        else if(y2_tmp[i] < y_min)
+        {
+            y_min = y2_tmp[i];
+        }
+    }
+    // cout << "( " << x_max << ", " << y_max << " )  " <<  "( " << x_min << ", " << y_min << " )" << endl;
+    if(count_pin > 0)
+    {
+        return(fabs(x_max - x_min)+fabs(y_max-y_min));
+    }
+    else
+    {
+        return 0;
+    }
+    
+
 };
+
+double HPWL_total(vector<Macro>macro_list)
+{
+    double total_HPWL = 0;
+    int number = macro_list.size();
+    int dir_list[300];
+    cout << number << " +++";
+    
+    for(int i = 0; i < number; i++)
+    {
+        if(macro_list[i].name[0] == 'F')
+        {
+            if(macro_list[i].name[0] == 'N')
+            {
+                dir_list[i] = 4;
+            }
+            else if(macro_list[i].name[0] == 'S')
+            {
+                dir_list[i] = 6;
+            }
+        }
+        else if(macro_list[i].name[0] == 'S')
+        {
+            dir_list[i] = 2;
+        }
+    }
+
+    if(number > 1)
+    {
+        for(int i = 0; i < number; i ++)
+        {
+            for(int j = i+1; j < number; j++)
+            {
+                total_HPWL += count_length(macro_list[i], macro_list[j], dir_list[i], dir_list[j]);
+            }
+        }
+        return total_HPWL;
+    }    
+    else 
+    {
+        return 0;
+    }
+    // N = 0, S = 2, FN = 4, FS = 6
+}
 
 int main(int argc, char *argv[]) {
 
@@ -568,15 +694,24 @@ int main(int argc, char *argv[]) {
     
     // Pasre LEF file
     myLEFParse(argv[2]);
-    // Algorithm
-    FILE *TXT_file = fopen(argv[5], "r");
-    char s[128];
-    fscanf(TXT_file, "%s", s);
-    fscanf(TXT_file, "%s", s);
-    int constraint = atoi(s);
-    fclose(TXT_file);
-    mySlidingWindow(constraint, 4);
-    // cout << store_name[1] << "hi";
+
+    
+    // for(int i=0;i<count; i++){
+    //     for(int j=0;j<count;j++){
+    //         cout << relevance[i][j] << " ";
+    //     }
+    //     cout << endl;
+    // }
+    // Write the output
+
+    writeDMP(argv[4], argv[6]);
+
+    cout << "The HPWL is : " << endl;
+    //cout << count_length(MacroList[83], MacroList[81], 0, 0) << endl;
+    cout << HPWL_total(MacroList) << endl;
+
     return 0;
 }
+
+
 
